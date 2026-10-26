@@ -11,7 +11,7 @@ make test
 worklog help
 ```
 
-While working, keep a watcher running so each save to a draft is recorded as it happens (every command also checks first):
+While working, keep a watcher running so each save to a draft is recorded as it happens (every command also checks first). `make watch-at-login` runs it in the background from login on (`make no-watch-at-login` undoes it); or run it in a terminal:
 
 ```bash
 worklog watch
