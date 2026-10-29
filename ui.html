@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worklog</title>
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #fff; --ink: #1d1c1a; --muted: #6d6a64; --line: #e3e0da; --soft: #efede8;
+  --accent: #2f5bd3; --accent-ink: #fff; --good: #1f7a4a; --warn: #9a6200; --bad: #b3261e;
+  --add: #dff3e4; --add-ink: #12572f; --del: #fbe3e1; --del-ink: #8c1d16;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --panel: #1f1f1d; --ink: #ecebe7; --muted: #9b988f; --line: #33322f; --soft: #2a2927;
+    --accent: #7c9cf5; --accent-ink: #10131c; --good: #5ec28a; --warn: #e0a640; --bad: #f08a80;
+    --add: #1d3a27; --add-ink: #a6e3bb; --del: #44211e; --del-ink: #f4b4ad;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); }
+button, input, select, textarea { font: inherit; color: inherit; }
+.app { display: grid; grid-template-columns: 300px 1fr 340px; height: 100vh; }
+aside, main, .side { overflow: auto; }
+aside { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
+.side { border-left: 1px solid var(--line); background: var(--panel); padding: 14px; }
+main { padding: 18px 24px 40px; }
+
+.brand { padding: 14px 14px 8px; display: flex; justify-content: space-between; align-items: baseline; }
+.brand b { font-size: 15px; }
+.brand small { color: var(--muted); }
+.filters { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 10px; border-bottom: 1px solid var(--line); }
+.filters button { border: 1px solid var(--line); background: none; border-radius: 99px; padding: 2px 9px; cursor: pointer; font-size: 12px; color: var(--muted); }
+.filters button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.filters .n { opacity: .7; margin-left: 3px; }
+.list { flex: 1; overflow: auto; }
+.row { padding: 9px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.row:hover { background: var(--soft); }
+.row.on { background: var(--soft); box-shadow: inset 3px 0 var(--accent); }
+.row .t { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .m { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+
+.chip { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 99px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.chip.you { background: var(--accent); color: var(--accent-ink); }
+.chip.assistant { background: var(--warn); color: var(--panel); }
+.chip.send { background: var(--good); color: var(--panel); }
+.chip.reply { background: var(--soft); color: var(--ink); border: 1px solid var(--line); }
+
+h1 { font-size: 20px; margin: 0 0 4px; }
+.meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.path { font-family: var(--mono); font-size: 11.5px; color: var(--muted); cursor: pointer; }
+.path:hover { color: var(--ink); }
+.tabs { display: flex; gap: 2px; margin: 16px 0 10px; border-bottom: 1px solid var(--line); }
+.tabs button { background: none; border: 0; padding: 7px 12px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button.on { color: var(--ink); border-bottom-color: var(--ink); font-weight: 550; }
+
+.banner { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 10px 0; background: var(--panel); font-size: 13px; }
+.banner.warn { border-color: var(--warn); }
+.banner.err { border-color: var(--bad); color: var(--bad); }
+.anote { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+.anote b { color: var(--ink); font-weight: 550; }
+
+.editor { width: 100%; min-height: 58vh; resize: vertical; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); font: 15px/1.6 var(--sans); outline: none; tab-size: 2; }
+.editor:focus { border-color: var(--accent); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.bar .grow { flex: 1; }
+.count { color: var(--muted); font-size: 12px; }
+
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.good { background: var(--good); color: var(--panel); border-color: var(--good); }
+.btn.quiet { border-color: transparent; color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+.diff { white-space: pre-wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; font: 15px/1.6 var(--sans); }
+.diff ins { background: var(--add); color: var(--add-ink); text-decoration: none; border-radius: 2px; }
+.diff del { background: var(--del); color: var(--del-ink); border-radius: 2px; }
+.pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+.pick select { max-width: 320px; }
+
+.tl { list-style: none; padding: 0; margin: 0; }
+.tl li { border-left: 2px solid var(--line); padding: 2px 0 12px 14px; position: relative; }
+.tl li::before { content: ""; position: absolute; left: -5px; top: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.tl li.user::before { background: var(--accent); }
+.tl li.assistant::before { background: var(--warn); }
+.tl .when { color: var(--muted); font-size: 12px; }
+.tl .what { margin-top: 1px; }
+.tl pre { white-space: pre-wrap; font: 13px/1.5 var(--sans); background: var(--soft); padding: 8px 10px; border-radius: 6px; margin: 6px 0 0; }
+.tl .acts button { font-size: 12px; margin-top: 4px; }
+
+.card { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
+.card > summary { padding: 10px 12px; cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+.card > summary::-webkit-details-marker { display: none; }
+.card > summary::after { content: "+"; color: var(--muted); font-weight: 400; }
+.card[open] > summary::after { content: "–"; }
+.card .body { padding: 0 12px 12px; display: grid; gap: 8px; }
+.card.hl { border-color: var(--accent); }
+.hint { color: var(--muted); font-size: 12px; margin: 0; }
+label.f { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.side input, .side select, .side textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--bg); }
+.side textarea { min-height: 70px; resize: vertical; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { flex: 1; background: none; border: 0; padding: 6px 4px; cursor: pointer; font-size: 12.5px; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--ink); color: var(--bg); }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips button { border: 1px solid var(--line); background: none; border-radius: 99px; padding: 2px 9px; cursor: pointer; font-size: 12px; }
+.chips button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.row2 { display: flex; gap: 6px; flex-wrap: wrap; }
+.empty { color: var(--muted); padding: 60px 0; text-align: center; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 240px 1fr; }
+  .side { grid-column: 2; border-left: 0; border-top: 1px solid var(--line); }
+  .app { height: auto; } aside { height: 100vh; position: sticky; top: 0; }
+}
+@media (max-width: 720px) {
+  .app { display: block; } aside { height: auto; max-height: 40vh; position: static; } main { padding: 14px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><b>Worklog</b><small id="sync"></small></div>
+    <div class="filters" id="filters"></div>
+    <div class="list" id="list"></div>
+  </aside>
+  <main id="main"><div class="empty">Select an item.</div></main>
+  <div class="side" id="side"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const FILTERS = [
+  ["you", "Your turn"], ["assistant", "With assistant"], ["send", "To send"], ["reply", "Sent"], ["open", "All open"], ["all", "Everything"],
+];
+const WAIT_LABEL = { you: "your turn", assistant: "with assistant", send: "to send", reply: "awaiting reply" };
+const RATINGS = [["good", "Send as is"], ["edits", "Needs edits"], ["redo", "Start again"]];
+const ASPECTS = ["Too long", "Tone", "Facts wrong", "Weak opening", "Not personal", "Offer", "Subject line", "Call to action", "Jargon", "Structure", "Claims too strong", "Wrong person"];
+const RESULTS = ["replied", "positive", "meeting", "negative", "no-reply", "bounced"];
+
+let state = { items: [], filter: localGet("filter") || "you", sel: location.hash.slice(1) || null, cur: null, tab: "draft", dirty: false, fb: { rating: "", aspects: [] } };
+
+function localGet(k) { try { return localStorage.getItem("worklog." + k); } catch { return null; } }
+function localSet(k, v) { try { localStorage.setItem("worklog." + k, v); } catch {} }
+
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.error || r.statusText); e.code = r.status; throw e; }
+  return j;
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200); }
+function ago(ts) {
+  const s = (Date.now() - new Date(ts)) / 1000;
+  if (s < 60) return "now"; if (s < 3600) return Math.floor(s / 60) + "m"; if (s < 86400) return Math.floor(s / 3600) + "h";
+  return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+function when(ts) { return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+function words(t) { return (t.match(/\S+/g) || []).length; }
+
+// ---- list ----
+function match(it, f) {
+  if (f === "all") return true;
+  if (f === "open") return it.status !== "done" && it.status !== "dropped";
+  return it.waiting === f;
+}
+async function loadList() {
+  try {
+    state.items = await api("/api/items?all=1");
+    $("#sync").textContent = "";
+  } catch (e) { $("#sync").textContent = "offline"; return; }
+  renderList();
+}
+function renderList() {
+  $("#filters").innerHTML = FILTERS.map(([k, l]) => {
+    const n = state.items.filter(it => match(it, k)).length;
+    return `<button class="${state.filter === k ? "on" : ""}" data-f="${k}">${l}<span class="n">${n}</span></button>`;
+  }).join("");
+  const rows = state.items.filter(it => match(it, state.filter));
+  $("#list").innerHTML = rows.length ? rows.map(it => `
+    <div class="row ${it.id === state.sel ? "on" : ""}" data-id="${esc(it.id)}">
+      <div class="t">${esc(it.title)}</div>
+      <div class="m">${it.waiting ? `<span class="chip ${it.waiting}">${WAIT_LABEL[it.waiting]}</span>` : `<span class="chip">${esc(it.status)}</span>`}
+        <span>${esc(it.kind)}</span>${it.org ? `<span>· ${esc(it.org)}</span>` : ""}<span style="margin-left:auto">${ago(it.last)}</span></div>
+    </div>`).join("") : `<div class="empty">Nothing here.</div>`;
+}
+$("#filters").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.filter = b.dataset.f; localSet("filter", state.filter); renderList(); };
+$("#list").onclick = async e => { const r = e.target.closest(".row"); if (r) await select(r.dataset.id); };
+
+// ---- item ----
+async function select(id, keepTab) {
+  if (state.dirty && state.cur && id !== state.sel) await save(true);
+  state.sel = id; history.replaceState(null, "", "#" + id);
+  if (!keepTab) { state.tab = "draft"; state.fb = { rating: "", aspects: [] }; }
+  renderList();
+  try { state.cur = await api("/api/items/" + encodeURIComponent(id)); }
+  catch (e) { $("#main").innerHTML = `<div class="banner err">${esc(e.message)}</div>`; $("#side").innerHTML = ""; return; }
+  state.dirty = false; state.stale = false;
+  renderMain(); renderSide();
+}
+
+function emailParts(text) {
+  // Drafts start with header lines (To:, Subject:) and a blank line, then the body.
+  const m = text.match(/^((?:[A-Za-z-]+:.*\n)+)\n([\s\S]*)$/);
+  if (!m) return null;
+  const subj = m[1].match(/^Subject:\s*(.*)$/mi);
+  return { subject: subj ? subj[1].trim() : "", body: m[2].replace(/\s+$/, "") + "\n" };
+}
+
+function renderMain() {
+  const c = state.cur, it = c.item;
+  const people = (it.people || []).join("; ");
+  $("#main").innerHTML = `
+    <h1>${esc(it.title)}</h1>
+    <div class="meta">
+      ${it.waiting ? `<span class="chip ${it.waiting}">${WAIT_LABEL[it.waiting]}</span>` : ""}<span class="chip">${esc(it.status)}</span>
+      <span>${esc(it.kind)}</span>${it.task ? `<span>${esc(it.task)}</span>` : ""}${it.org ? `<span>${esc(it.org)}</span>` : ""}${people ? `<span>${esc(people)}</span>` : ""}
+    </div>
+    <div class="path" title="Copy the path. You can also edit this file in any editor." id="path">${esc(c.file)}</div>
+    <div id="stale"></div>
+    <div class="tabs">${[["draft", "Draft"], ["changes", "Your changes"], ["history", "History"]].map(([k, l]) =>
+      `<button data-tab="${k}" class="${state.tab === k ? "on" : ""}">${l}</button>`).join("")}</div>
+    <div id="pane"></div>`;
+  $("#path").onclick = () => { navigator.clipboard.writeText(c.file); toast("Path copied"); };
+  $(".tabs").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.tab = b.dataset.tab; renderMain(); };
+  renderStale();
+  ({ draft: renderDraft, changes: renderChanges, history: renderHistory })[state.tab]();
+}
+
+function renderStale() {
+  const el = $("#stale"); if (!el) return;
+  el.innerHTML = state.stale ? `<div class="banner warn">The draft changed outside this page (a new proposal or a save in an editor).
+    <button class="btn" id="reload">Load the new text</button> Your unsaved text here will be lost.</div>` : "";
+  if (state.stale) $("#reload").onclick = () => { state.dirty = false; select(state.sel, true); };
+}
+
+function renderDraft() {
+  const c = state.cur, p = c.proposal;
+  const text = state.dirty ? $("#ed")?.value ?? c.text : c.text;
+  $("#pane").innerHTML = `
+    ${p ? `<p class="anote">Last proposal ${when(p.ts)}${p.note ? ` · <b>Assistant's note:</b> ${esc(p.note)}` : ""}</p>` : ""}
+    ${c.final ? `<p class="anote"><b>Confirmed</b> ${when(c.final.ts)} (${esc(c.final.via)})</p>` : ""}
+    <textarea class="editor" id="ed" spellcheck="true">${esc(text)}</textarea>
+    <div class="bar">
+      <button class="btn primary" id="save" disabled>Save</button><span class="count"><kbd>⌘S</kbd></span>
+      <span class="grow"></span>
+      <span class="count" id="wc"></span>
+      <button class="btn" id="copySubj" hidden>Copy subject</button>
+      <button class="btn" id="copyBody" hidden>Copy body</button>
+      <button class="btn" id="copyAll">Copy all</button>
+      ${p ? `<button class="btn quiet" id="revert" title="Put the last proposal back in the editor">Back to proposal</button>` : ""}
+    </div>`;
+  const ed = $("#ed");
+  const upd = () => {
+    $("#save").disabled = !state.dirty;
+    $("#wc").textContent = words(emailParts(ed.value)?.body ?? ed.value) + " words" + (state.dirty ? " · unsaved" : "");
+    const em = emailParts(ed.value);
+    $("#copySubj").hidden = !em?.subject; $("#copyBody").hidden = !em;
+  };
+  ed.oninput = () => { state.dirty = ed.value !== c.text; upd(); };
+  $("#save").onclick = () => save();
+  $("#copyAll").onclick = () => { navigator.clipboard.writeText(ed.value); toast("Copied"); };
+  $("#copySubj").onclick = () => { navigator.clipboard.writeText(emailParts(ed.value).subject); toast("Subject copied"); };
+  $("#copyBody").onclick = () => { navigator.clipboard.writeText(emailParts(ed.value).body); toast("Body copied"); };
+  if ($("#revert")) $("#revert").onclick = () => { ed.value = p.text; ed.oninput(); };
+  upd();
+}
+
+async function save(quiet) {
+  const ed = $("#ed");
+  if (!state.dirty || !ed) return true;
+  try {
+    const r = await api(`/api/items/${encodeURIComponent(state.sel)}/save`, { text: ed.value, base: state.cur.hash });
+    state.cur.text = ed.value; state.cur.hash = r.hash; state.dirty = false;
+    if (!quiet) toast(r.saved ? "Saved as your edit" : "No change");
+    if ($("#save")) { $("#save").disabled = true; ed.oninput(); }
+    return true;
+  } catch (e) {
+    if (e.code === 409) { state.stale = true; renderStale(); }
+    toast(e.message); return false;
+  }
+}
+
+async function renderChanges() {
+  const c = state.cur;
+  const vs = c.events.filter(e => e.type === "version" && !e.data?.deleted);
+  if (!vs.length) { $("#pane").innerHTML = `<div class="empty">No versions yet.</div>`; return; }
+  const opt = (sel) => vs.map(v => `<option value="${v.id}" ${v.id === sel ? "selected" : ""}>${when(v.ts)} · ${v.actor === "user" ? "you" : "assistant"} · ${esc(v.data.stage)}</option>`).join("");
+  const from = state.from || c.proposal?.id || vs[0].id;
+  $("#pane").innerHTML = `
+    <div class="pick">From <select id="from">${opt(from)}</select> to <select id="to"><option value="">the draft now</option>${opt(state.to)}</select></div>
+    <div id="dstats" class="anote"></div><div class="diff" id="diff">…</div>`;
+  $("#from").onchange = e => { state.from = e.target.value; renderChanges(); };
+  $("#to").onchange = e => { state.to = e.target.value; renderChanges(); };
+  if (state.dirty) await save(true);
+  const q = new URLSearchParams({ from }); if (state.to) q.set("to", state.to);
+  const d = await api(`/api/items/${encodeURIComponent(state.sel)}/diff?` + q);
+  const s = d.stats;
+  $("#dstats").textContent = s.words_removed + s.words_added === 0 ? "No changes." :
+    `${s.words_removed} words removed, ${s.words_added} added · ${Math.round(s.similarity * 100)}% the same`;
+  $("#diff").innerHTML = d.ops.map(([k, t]) => k === "+" ? `<ins>${esc(t)}</ins>` : k === "-" ? `<del>${esc(t)}</del>` : esc(t)).join("");
+}
+
+function renderHistory() {
+  const evs = [...state.cur.events].reverse();
+  $("#pane").innerHTML = `<ul class="tl">${evs.map(e => {
+    let body = "";
+    const d = e.data || {};
+    if (e.type === "instruction" || e.type === "note") body = `<pre>${esc(d.text)}</pre>`;
+    if (e.type === "annotation") body = `<pre>${esc(fmtLabels(d.labels))}${d.note ? "\n" + esc(d.note) : ""}</pre>`;
+    if (e.text) body += `<pre>${esc(e.text)}</pre>`;
+    const acts = e.type === "version" && !d.deleted ? `<div class="acts"><button class="btn quiet" data-cmp="${e.id}">Compare with the draft now</button></div>` : "";
+    const who = e.actor === "user" ? "you" : (d.agent ? `${d.agent}${d.model ? " · " + d.model : ""}` : e.actor);
+    return `<li class="${e.actor}"><div class="when">${when(e.ts)} · ${esc(who)}</div><div class="what">${esc(e.summary)}</div>${body}${acts}</li>`;
+  }).join("")}</ul>`;
+  $("#pane").onclick = ev => { const b = ev.target.closest("[data-cmp]"); if (!b) return; state.from = b.dataset.cmp; state.to = ""; state.tab = "changes"; renderMain(); };
+}
+function fmtLabels(l) {
+  if (!l) return "";
+  return Object.entries(l).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" · ");
+}
+
+// ---- actions ----
+function renderSide() {
+  const c = state.cur, it = c.item, w = it.waiting;
+  const to = (it.people || [])[0] || "";
+  const isEmail = it.kind === "email";
+  $("#side").innerHTML = `
+    <details class="card ${w === "you" ? "hl" : ""}" ${w === "you" || w === "assistant" ? "open" : ""}>
+      <summary>Feedback on the proposal</summary>
+      <div class="body">
+        ${c.proposal ? "" : `<p class="hint">No proposal from the assistant yet.</p>`}
+        <div class="seg" id="rating">${RATINGS.map(([k, l]) => `<button data-r="${k}" class="${state.fb.rating === k ? "on" : ""}">${l}</button>`).join("")}</div>
+        <div class="chips" id="aspects">${ASPECTS.map(a => `<button data-a="${esc(a)}" class="${state.fb.aspects.includes(a) ? "on" : ""}">${esc(a)}</button>`).join("")}</div>
+        <label class="f">What to change, or what works
+          <textarea id="fbText" placeholder="For example: lead with their own agent. Cut the second paragraph.">${esc(state.fb.text || "")}</textarea></label>
+        <div class="row2">
+          <button class="btn primary" id="askRev">Ask for a revision</button>
+          <button class="btn" id="fbOnly">Save feedback only</button>
+        </div>
+        <p class="hint">Your saved edits are recorded first. The assistant sees the request with <code>worklog pending</code>.</p>
+      </div>
+    </details>
+
+    <details class="card ${w === "you" ? "hl" : ""}" ${w === "you" ? "open" : ""}>
+      <summary>Confirm</summary>
+      <div class="body">
+        <p class="hint">Saves the draft and marks it as the final text. ${isEmail ? "Then send it from your mail client." : ""}</p>
+        <button class="btn good" id="confirm">Confirm the draft as final</button>
+      </div>
+    </details>
+
+    <details class="card ${w === "send" ? "hl" : ""}" ${w === "send" ? "open" : ""}>
+      <summary>Mark as sent</summary>
+      <div class="body">
+        <div class="row2">
+          <label class="f" style="flex:1">Channel <select id="chan">${["gmail", "linkedin", "other email", "call", "in person", "other"].map(x => `<option>${x}</option>`).join("")}</select></label>
+          <label class="f" style="flex:1.4">To <input id="sendTo" value="${esc(to)}"></label>
+        </div>
+        <label class="f">Text you sent, if you changed it after you confirmed (optional)
+          <textarea id="sentText" placeholder="Paste the sent text"></textarea></label>
+        <button class="btn primary" id="sent">Mark as sent</button>
+      </div>
+    </details>
+
+    <details class="card ${w === "reply" ? "hl" : ""}" ${w === "reply" ? "open" : ""}>
+      <summary>Outcome</summary>
+      <div class="body">
+        <div class="chips" id="result">${RESULTS.map(r => `<button data-res="${r}">${r}</button>`).join("")}</div>
+        <label class="f">Their reply (optional)<textarea id="reply" placeholder="Paste the reply"></textarea></label>
+        <label class="f">Note (optional)<input id="outNote"></label>
+        <button class="btn primary" id="outcome">Record outcome</button>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary>Note or status</summary>
+      <div class="body">
+        <label class="f">Note about this item<textarea id="noteText"></textarea></label>
+        <button class="btn" id="note">Add note</button>
+        <div class="row2" style="margin-top:6px">
+          <button class="btn" data-st="waiting">Waiting</button>
+          <button class="btn" data-st="done">Done</button>
+          <button class="btn" data-st="dropped">Drop</button>
+          <button class="btn quiet" data-st="drafting">Back to drafting</button>
+        </div>
+      </div>
+    </details>`;
+
+  const fb = state.fb;
+  $("#rating").onclick = e => { const b = e.target.closest("button"); if (!b) return; fb.rating = fb.rating === b.dataset.r ? "" : b.dataset.r; renderSide(); };
+  $("#aspects").onclick = e => { const b = e.target.closest("button"); if (!b) return; const a = b.dataset.a;
+    fb.aspects = fb.aspects.includes(a) ? fb.aspects.filter(x => x !== a) : [...fb.aspects, a]; b.classList.toggle("on"); };
+  $("#fbText").oninput = e => { fb.text = e.target.value; };
+  $("#askRev").onclick = () => feedback(true);
+  $("#fbOnly").onclick = () => feedback(false);
+  $("#confirm").onclick = confirmFinal;
+  $("#sent").onclick = markSent;
+  let res = "";
+  $("#result").onclick = e => { const b = e.target.closest("button"); if (!b) return; res = b.dataset.res;
+    $("#result").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); };
+  $("#outcome").onclick = () => act("outcome", { result: res, reply: $("#reply").value, note: $("#outNote").value }, "Outcome recorded", !res && "Choose a result.");
+  $("#note").onclick = () => act("note", { text: $("#noteText").value }, "Note added", !$("#noteText").value.trim() && "Write the note.");
+  $("#side").querySelectorAll("[data-st]").forEach(b => b.onclick = () => act("status", { status: b.dataset.st }, "Status: " + b.dataset.st));
+}
+
+async function act(action, body, ok, invalid) {
+  if (invalid) { toast(invalid); return false; }
+  try { await api(`/api/items/${encodeURIComponent(state.sel)}/${action}`, body); toast(ok); await refresh(); return true; }
+  catch (e) { toast(e.message); return false; }
+}
+
+async function feedback(revise) {
+  const fb = state.fb, text = (fb.text || "").trim();
+  if (revise && !text) { toast("Write what to change."); return; }
+  if (!fb.rating && !fb.aspects.length && !text) { toast("Choose a rating, a tag or write a note."); return; }
+  if (!(await save(true))) return;
+  const labels = {};
+  if (fb.rating) labels.rating = fb.rating;
+  if (fb.aspects.length) labels.issues = fb.aspects;
+  try {
+    if (Object.keys(labels).length || !revise)
+      await api(`/api/items/${encodeURIComponent(state.sel)}/annotate`, { target: state.cur.proposal?.id || "", labels, note: revise ? "" : text });
+    if (revise) await api(`/api/items/${encodeURIComponent(state.sel)}/instruct`, { text });
+    state.fb = { rating: "", aspects: [] };
+    toast(revise ? "Revision requested" : "Feedback saved");
+    await refresh();
+  } catch (e) { toast(e.message); }
+}
+
+async function confirmFinal() {
+  if (!(await save(true))) return;
+  if (await act("final", {}, "Confirmed as final")) {}
+}
+
+async function markSent() {
+  const sent = $("#sentText").value;
+  if (sent.trim() && !(await act("final", { text: sent, paste: true }, "Sent text recorded"))) return;
+  await act("status", { status: "sent", channel: $("#chan").value, to: $("#sendTo").value }, "Marked as sent");
+}
+
+async function refresh() {
+  await loadList();
+  if (state.sel) await select(state.sel, true);
+}
+
+// ---- live ----
+async function poll() {
+  await loadList();
+  if (!state.sel || !state.cur) return;
+  try {
+    const c = await api("/api/items/" + encodeURIComponent(state.sel));
+    if (c.hash !== state.cur.hash || c.events.length !== state.cur.events.length) {
+      if (state.dirty && c.hash !== state.cur.hash) { state.stale = true; renderStale(); }
+      else if (!state.dirty) { const keep = state.fb; await select(state.sel, true); state.fb = keep; }
+    }
+  } catch {}
+}
+setInterval(() => { if (!document.hidden) poll(); }, 4000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); save(); }
+});
+window.addEventListener("hashchange", () => { const id = decodeURIComponent(location.hash.slice(1)); if (id && id !== state.sel) select(id); });
+window.addEventListener("beforeunload", e => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+(async () => {
+  await loadList();
+  if (!state.sel) {
+    const first = state.items.find(it => match(it, state.filter));
+    if (first) state.sel = first.id;
+  }
+  if (state.sel) await select(state.sel);
+})();
+</script>
+</body>
+</html>

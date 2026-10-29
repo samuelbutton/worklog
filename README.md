@@ -17,11 +17,22 @@ While working, keep a watcher running so each save to a draft is recorded as it 
 worklog watch
 ```
 
+## A page instead of commands
+
+```bash
+worklog serve           # http://127.0.0.1:7777, loopback only
+```
+
+Lists items by whose turn it is, edits the draft (each save is your edit), shows what you changed against the proposal, and
+records feedback (a rating, what was wrong, what to change), confirmations, sends and outcomes. It writes through the same calls
+as the commands. A revision you ask for there waits in `worklog pending` until the assistant proposes again.
+
 ## For an assistant working with the founder
 
 - Create an item for each piece of work meant to leave the machine or to be decided: `worklog new <kind> <title> …`.
 - Propose text only through `worklog propose <item> --stdin`; never write the working copy directly. Any other change there
   counts as the founder's.
+- Run `worklog pending` at the start of work: it lists what the founder asked for on the page, with their feedback.
 - Record what the founder asks you to change with `worklog instruct`, and record finals, statuses, outcomes, decisions and
   notes as they happen.
 - Set `WORKLOG_AGENT`, `WORKLOG_MODEL` and `WORKLOG_SESSION` on your commands so your events say who you are.

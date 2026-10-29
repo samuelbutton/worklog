@@ -5,6 +5,8 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -233,5 +235,93 @@ func TestStrReadsNumbersBeforeAndAfterARoundTrip(t *testing.T) {
 	e := Event{Data: map[string]any{"bytes": 12, "f": 1.5}}
 	if e.Str("bytes") != "12" || e.Str("f") != "1.5" {
 		t.Fatalf("got %q %q", e.Str("bytes"), e.Str("f"))
+	}
+}
+
+func TestThePageRecordsEditsFeedbackAndConfirmationsLikeTheCommands(t *testing.T) {
+	home := setup(t)
+	wl(t, "", "new", "email", "Opener: Acme", "--person", "Jane <jane@acme.com>")
+	id := "email-opener-acme"
+	wl(t, "Hi Jane,\n\nHow do you test your agent?\n\nSam\n", "propose", id, "--stdin")
+	srv := httptest.NewServer(mustStore(t).handler())
+	defer srv.Close()
+	post := func(action string, body any, want int) map[string]any {
+		t.Helper()
+		b, _ := json.Marshal(body)
+		req, _ := http.NewRequest("POST", srv.URL+"/api/items/"+id+"/"+action, bytes.NewReader(b))
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var out map[string]any
+		json.NewDecoder(res.Body).Decode(&out)
+		if res.StatusCode != want {
+			t.Fatalf("%s: status %d, want %d (%v)", action, res.StatusCode, want, out)
+		}
+		return out
+	}
+	var got struct {
+		Hash string                   `json:"hash"`
+		Item struct{ Waiting string } `json:"item"`
+	}
+	res, _ := http.Get(srv.URL + "/api/items/" + id)
+	json.NewDecoder(res.Body).Decode(&got)
+	res.Body.Close()
+	if got.Item.Waiting != "you" {
+		t.Fatalf("a fresh proposal is waiting on %q, want you", got.Item.Waiting)
+	}
+
+	edited := "Hi Jane,\n\nHow does Acme test its agent?\n\nSam\n"
+	post("save", map[string]any{"text": edited, "base": got.Hash}, 200)
+	post("save", map[string]any{"text": "stale", "base": got.Hash}, 409) // the page's copy is old now
+	post("annotate", map[string]any{"labels": map[string]any{"rating": "edits", "issues": []string{"Tone"}}}, 200)
+	post("instruct", map[string]any{"text": "shorter"}, 200)
+	post("instruct", map[string]any{"text": " "}, 400)
+
+	var pend bytes.Buffer
+	mustStore(t).PrintPending(&pend)
+	if !strings.Contains(pend.String(), "shorter") || !strings.Contains(pend.String(), `"rating":"edits"`) {
+		t.Fatalf("pending lacks the instruction or its feedback:\n%s", pend.String())
+	}
+	wl(t, "Hi Jane, how does Acme test its agent?\n\nSam\n", "propose", id, "--stdin")
+	pend.Reset()
+	mustStore(t).PrintPending(&pend)
+	if !strings.Contains(pend.String(), "no instructions waiting") {
+		t.Fatalf("an answered instruction is still pending:\n%s", pend.String())
+	}
+
+	post("final", map[string]any{}, 200)
+	post("status", map[string]any{"status": "sent", "channel": "gmail", "to": "jane@acme.com"}, 200)
+	post("outcome", map[string]any{"result": "positive", "reply": "Sure, Thursday."}, 200)
+
+	it, _ := mustStore(t).Item(id)
+	var seq []string
+	for _, e := range it.Events {
+		s := e.Type + ":" + e.Actor
+		if e.Type == "version" {
+			s += ":" + e.Str("stage") + ":" + e.Str("via")
+		}
+		seq = append(seq, s)
+	}
+	want := "item:user version:assistant:proposed:paste version:user:edited:ui annotation:user instruction:user " +
+		"version:assistant:revised:paste version:user:final:workcopy status:user outcome:user"
+	if strings.Join(seq, " ") != want {
+		t.Fatalf("events\n got %s\nwant %s", strings.Join(seq, " "), want)
+	}
+	if b, _ := os.ReadFile(filepath.Join(home, "work", id, "draft.md")); !strings.HasPrefix(string(b), "Hi Jane, how") {
+		t.Fatalf("working copy: %q", b)
+	}
+	if waiting(it) != "" {
+		t.Fatalf("a sent item with an outcome is waiting on %q", waiting(it))
+	}
+
+	// Another site cannot write through the founder's browser.
+	req, _ := http.NewRequest("POST", srv.URL+"/api/items/"+id+"/note", strings.NewReader(`{"text":"x"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://evil.example")
+	if res, _ := http.DefaultClient.Do(req); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-origin write: %d", res.StatusCode)
 	}
 }

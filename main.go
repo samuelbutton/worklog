@@ -47,6 +47,10 @@ Capture:
 Reading:
   items [--all]    show <item>    diff <item> [--from ID] [--to ID]    today [--date YYYY-MM-DD]
   export pairs|events                  JSON lines on stdout
+  pending                              instructions the assistant has not answered yet, with the feedback given
+
+A page instead of commands:
+  serve [--addr 127.0.0.1:7777]        read, edit, confirm and give feedback in a browser; loopback only
   reindex                              rebuild caches from the record
 
 Every command takes --by user|assistant (who is acting; default user, propose defaults to assistant).
@@ -150,7 +154,7 @@ func run(argv []string, stdin io.Reader, out io.Writer) error {
 		return err
 	}
 	// The founder's saves come first, so the record keeps the order things happened in.
-	if cmd != "reindex" && cmd != "watch" {
+	if cmd != "reindex" && cmd != "watch" && cmd != "serve" {
 		if _, err := s.Scan(); err != nil {
 			return fmt.Errorf("scanning the work folder: %w", err)
 		}
@@ -424,6 +428,10 @@ func run(argv []string, stdin io.Reader, out io.Writer) error {
 	case "reindex":
 		_, err := s.Reindex()
 		return err
+	case "pending":
+		return s.PrintPending(out)
+	case "serve":
+		return s.Serve(orDefault(a.get("addr"), "127.0.0.1:7777"), out)
 	}
 	return fmt.Errorf("unknown command %q (worklog help)", cmd)
 }

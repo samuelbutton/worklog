@@ -140,6 +140,8 @@ worklog note "Openers with a named failure get read; generic ones don't"
 | `worklog diff <item>` | What the founder changed in the assistant's last proposal |
 | `worklog export pairs` | One JSON line per item: first and last proposal, final, instructions, edit size, outcomes and annotations. This feeds the Friday review and, later, training |
 | `worklog export events` | Everything, for any other analysis |
+| `worklog pending` | Instructions not yet answered by a new proposal, with the founder's feedback on the proposal before them |
+| `worklog serve` | A local page (loopback only) for the founder: read, edit, compare, give feedback, confirm, mark sent, record outcomes. It calls the same functions as the commands, so the record is the same |
 
 ## Emails specifically
 
